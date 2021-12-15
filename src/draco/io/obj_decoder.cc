@@ -402,12 +402,12 @@ bool ObjDecoder::ParseFace(Status *status) {
   // Face definition found!
   buffer()->Advance(1);
   if (!counting_mode_) {
-    std::array<int32_t, 3> indices[4];
+    std::array<int32_t, 3> indices[64];
     // Parse face indices (we try to look for up to four to support quads).
     int num_valid_indices = 0;
-    for (int i = 0; i < 4; ++i) {
+    for (int i = 0; i < 64; ++i) {
       if (!ParseVertexIndices(&indices[i])) {
-        if (i == 3) {
+        if (i >= 3) {
           break;  // It's OK if there is no fourth vertex index.
         }
         *status = Status(Status::DRACO_ERROR, "Failed to parse vertex indices");
@@ -415,6 +415,16 @@ bool ObjDecoder::ParseFace(Status *status) {
       }
       ++num_valid_indices;
     }
+#if 1
+      int v = 3 * num_obj_faces_;
+			for (int j = 1; j < num_valid_indices - 1; j++) {
+        const PointIndex vert_id(v);
+        MapPointToVertexIndices(PointIndex(v++), indices[0]);
+        MapPointToVertexIndices(PointIndex(v++), indices[j]);
+        MapPointToVertexIndices(PointIndex(v++), indices[j + 1]);
+        ++num_obj_faces_;
+			}
+#else
     // Process the first face.
     for (int i = 0; i < 3; ++i) {
       const PointIndex vert_id(3 * num_obj_faces_ + i);
@@ -435,6 +445,7 @@ bool ObjDecoder::ParseFace(Status *status) {
       MapPointToVertexIndices(vert_id + 2, indices[3]);
       ++num_obj_faces_;
     }
+#endif
   } else {
     // We are in the counting mode.
     // We need to determine how many triangles are in the obj face.
@@ -454,11 +465,13 @@ bool ObjDecoder::ParseFace(Status *status) {
         }
       }
     }
+    #if 0
     if (num_indices < 3 || num_indices > 4) {
       *status =
           Status(Status::DRACO_ERROR, "Invalid number of indices on a face");
       return false;
     }
+    #endif
     // Either one or two new triangles.
     num_obj_faces_ += num_indices - 2;
   }

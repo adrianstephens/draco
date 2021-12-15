@@ -174,11 +174,31 @@ AttributeValueIndex::ValueType PointAttribute::DeduplicateFormattedValues(
   AttributeHashableValue hashable_value;
   IndexTypeVector<AttributeValueIndex, AttributeValueIndex> value_map(
       num_unique_entries_);
+
+  AttributeValue min_value, max_value;
+  min_value.fill(std::numeric_limits<T>::max());
+  max_value.fill(std::numeric_limits<T>::min());
+  for (AttributeValueIndex i(0); i < num_unique_entries_; ++i) {
+    att_value = in_att.GetValue<T, num_components_t>(i + in_att_offset);
+    for (int c = 0; c < num_components_t; c++) {
+      min_value[c] = std::min(min_value[c], att_value[c]);
+      max_value[c] = std::max(max_value[c], att_value[c]);
+    }
+  }
+  auto  range = max_value[0] - min_value[0];
+  for (int c = 1; c < num_components_t; c++)
+    range = std::max(range, max_value[c] - min_value[c]);
+
+  auto  scale = 2047 / (range ? range : 1);
+
   for (AttributeValueIndex i(0); i < num_unique_entries_; ++i) {
     const AttributeValueIndex att_pos = i + in_att_offset;
     att_value = in_att.GetValue<T, num_components_t>(att_pos);
     // Convert the value to hashable type. Bit-copy real attributes to integers.
-    memcpy(&(hashable_value[0]), &(att_value[0]), sizeof(att_value));
+    //memcpy(&(hashable_value[0]), &(att_value[0]), sizeof(att_value));
+    for (int c = 0; c < num_components_t; c++) {
+      hashable_value[c] = floor((att_value[c] - min_value[c]) * scale + 0.5f);
+    }
 
     // Check if the given attribute value has been used before already.
     auto it = value_to_index_map.find(hashable_value);
